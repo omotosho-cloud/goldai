@@ -71,14 +71,24 @@ except Exception as e:
     print(f"Warning: IntegratedGoldAI initialization failed: {e}")
     integrated_system = None
 
-# App state
+# App state - per session isolation
+user_sessions = {}
 app_state = {
-    'running': True,  # Auto-start system
+    'running': True,  # Global system always running
     'last_signal': None,
     'active_trades': [],
     'performance_data': {},
-    'system_status': 'starting'
+    'system_status': 'running'
 }
+
+def get_user_session(session_id):
+    """Get or create user session"""
+    if session_id not in user_sessions:
+        user_sessions[session_id] = {
+            'viewing': True,  # User's view state (not system state)
+            'notifications': True
+        }
+    return user_sessions[session_id]
 
 @app.route('/')
 def index():
@@ -87,13 +97,15 @@ def index():
 
 @app.route('/api/status')
 def get_status():
-    """Get current system status"""
+    """Get current system status - always running for all users"""
     status_data = {
-        'running': bool(app_state['running']),
-        'system_status': str(app_state['system_status']),
+        'running': True,  # System always running on Railway
+        'system_status': 'running',
         'last_signal': clean_for_json(app_state['last_signal']),
         'active_trades_count': int(len(app_state['active_trades'])) if app_state['active_trades'] else 0,
-        'timestamp': datetime.now().isoformat()
+        'timestamp': datetime.now().isoformat(),
+        'deployment': 'railway',
+        'multi_user': True
     }
     return jsonify(clean_for_json(status_data))
 
@@ -149,41 +161,9 @@ def get_performance():
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)})
 
-@app.route('/api/system/start', methods=['POST'])
-def start_system():
-    """Start the AI signal system"""
-    if not app_state['running']:
-        app_state['running'] = True
-        app_state['system_status'] = 'starting'
-        
-        # Start system in background thread
-        thread = threading.Thread(target=run_signal_system)
-        thread.daemon = True
-        thread.start()
-        
-        # Wait a moment for system to start
-        time.sleep(0.5)
-        
-        return jsonify({'success': True, 'message': 'System started successfully'})
-    return jsonify({'success': False, 'message': 'System already running'})
 
-@app.route('/api/system/stop', methods=['POST'])
-def stop_system():
-    """Stop the AI signal system"""
-    app_state['running'] = False
-    app_state['system_status'] = 'stopped'
-    return jsonify({'success': True, 'message': 'System stopped'})
 
-@app.route('/api/retrain', methods=['POST'])
-def retrain_model():
-    """Force model retraining"""
-    try:
-        from model_trainer import ModelTrainer
-        trainer = ModelTrainer()
-        trainer.train_model()
-        return jsonify({'success': True, 'message': 'Model retrained successfully'})
-    except Exception as e:
-        return jsonify({'success': False, 'error': str(e)})
+
 
 def run_signal_system():
     """Background thread for signal generation - Hourly strategy (manual refresh UI)"""

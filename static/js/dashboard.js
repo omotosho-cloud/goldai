@@ -15,11 +15,6 @@ class GoldAIDashboard {
     }
 
     setupEventListeners() {
-        // System control
-        document.getElementById('toggle-system').addEventListener('click', () => {
-            this.toggleSystem();
-        });
-        
         // Refresh buttons
         document.getElementById('refresh-signal').addEventListener('click', () => {
             this.refreshCurrentSignal();
@@ -31,11 +26,6 @@ class GoldAIDashboard {
 
         document.getElementById('refresh-performance').addEventListener('click', () => {
             this.refreshPerformance();
-        });
-
-        // Retrain model
-        document.getElementById('retrain-model').addEventListener('click', () => {
-            this.retrainModel();
         });
     }
 
@@ -106,63 +96,23 @@ class GoldAIDashboard {
 
 
 
-    async toggleSystem() {
-        const button = document.getElementById('toggle-system');
-        const originalText = button.textContent;
-        
-        button.disabled = true;
-        button.innerHTML = '<span class="loading-spinner"></span> Processing...';
 
-        try {
-            const endpoint = this.isSystemRunning ? '/api/system/stop' : '/api/system/start';
-            const response = await fetch(endpoint, { method: 'POST' });
-            const data = await response.json();
-
-            if (data.success) {
-                this.isSystemRunning = !this.isSystemRunning;
-                this.updateSystemButton();
-                this.showNotification(data.message, 'success');
-                
-                // Force status refresh after 1 second
-                setTimeout(() => {
-                    this.refreshStatus();
-                }, 1000);
-            } else {
-                this.showNotification(data.message || 'Operation failed', 'error');
-            }
-        } catch (error) {
-            this.showNotification('Network error occurred', 'error');
-        } finally {
-            button.disabled = false;
-        }
-    }
 
     async refreshStatus() {
         try {
             const response = await fetch('/api/status');
             const data = await response.json();
             
-            // Update system running state
-            this.isSystemRunning = data.running;
-            
-            // Update UI elements
-            document.getElementById('system-status').textContent = data.system_status === 'running' ? 'Running' : 'Stopped';
+            // System always running in production
+            document.getElementById('system-status').textContent = 'Running';
             document.getElementById('active-trades-count').textContent = data.active_trades_count || 0;
             
             // Update status badge
             const badge = document.getElementById('status-badge');
-            if (data.running) {
-                badge.textContent = 'Running';
-                badge.className = 'badge bg-success me-2';
-            } else {
-                badge.textContent = 'Stopped';
-                badge.className = 'badge bg-secondary me-2';
-            }
+            badge.textContent = 'Running';
+            badge.className = 'badge bg-success me-2';
             
-            // Update system button
-            this.updateSystemButton();
-            
-            console.log(`Status updated: ${data.system_status}, Running: ${data.running}`);
+            console.log('Status updated: Production deployment');
         } catch (error) {
             console.error('Error refreshing status:', error);
         }
@@ -253,29 +203,7 @@ class GoldAIDashboard {
         }
     }
 
-    async retrainModel() {
-        const button = document.getElementById('retrain-model');
-        const originalText = button.textContent;
-        
-        button.disabled = true;
-        button.innerHTML = '<span class="loading-spinner"></span> Retraining...';
 
-        try {
-            const response = await fetch('/api/retrain', { method: 'POST' });
-            const data = await response.json();
-
-            if (data.success) {
-                this.showNotification('Model retrained successfully!', 'success');
-            } else {
-                this.showNotification(data.error || 'Retraining failed', 'error');
-            }
-        } catch (error) {
-            this.showNotification('Network error during retraining', 'error');
-        } finally {
-            button.disabled = false;
-            button.textContent = originalText;
-        }
-    }
 
     displaySignal(signal) {
         const container = document.getElementById('current-signal');
@@ -408,19 +336,7 @@ class GoldAIDashboard {
         }
     }
 
-    updateSystemButton() {
-        const button = document.getElementById('toggle-system');
-        const statusBadge = document.getElementById('status-badge');
-        const systemStatus = document.getElementById('system-status');
-        
-        if (this.isSystemRunning) {
-            button.innerHTML = '<i class="fas fa-stop"></i> Stop System';
-            button.className = 'btn btn-danger btn-sm me-2';
-        } else {
-            button.innerHTML = '<i class="fas fa-play"></i> Start System';
-            button.className = 'btn btn-success btn-sm me-2 btn-pulse';
-        }
-    }
+
 
     updateStatusBadge(status) {
         const badge = document.getElementById('status-badge');
