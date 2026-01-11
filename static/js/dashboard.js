@@ -97,6 +97,11 @@ class GoldAIDashboard {
                 this.isSystemRunning = !this.isSystemRunning;
                 this.updateSystemButton();
                 this.showNotification(data.message, 'success');
+                
+                // Force status refresh after 1 second
+                setTimeout(() => {
+                    this.refreshStatus();
+                }, 1000);
             } else {
                 this.showNotification(data.message || 'Operation failed', 'error');
             }
@@ -104,7 +109,6 @@ class GoldAIDashboard {
             this.showNotification('Network error occurred', 'error');
         } finally {
             button.disabled = false;
-            button.textContent = originalText;
         }
     }
 
@@ -115,11 +119,12 @@ class GoldAIDashboard {
             
             this.isSystemRunning = data.running;
             this.updateSystemButton();
-            this.updateStatusBadge(data.system_status);
             
-            document.getElementById('system-status').textContent = 
-                data.system_status.charAt(0).toUpperCase() + data.system_status.slice(1);
             document.getElementById('active-trades-count').textContent = data.active_trades_count;
+            
+            // Update last update time
+            const now = new Date().toLocaleTimeString();
+            console.log(`Status updated at ${now}: Running=${data.running}`);
         } catch (error) {
             console.error('Error refreshing status:', error);
         }
@@ -367,12 +372,21 @@ class GoldAIDashboard {
 
     updateSystemButton() {
         const button = document.getElementById('toggle-system');
+        const statusBadge = document.getElementById('status-badge');
+        const systemStatus = document.getElementById('system-status');
+        
         if (this.isSystemRunning) {
             button.textContent = 'Stop System';
             button.className = 'btn btn-danger btn-sm';
+            statusBadge.textContent = 'Running';
+            statusBadge.className = 'badge bg-success me-2';
+            systemStatus.textContent = 'Running';
         } else {
             button.textContent = 'Start System';
             button.className = 'btn btn-success btn-sm btn-pulse';
+            statusBadge.textContent = 'Stopped';
+            statusBadge.className = 'badge bg-secondary me-2';
+            systemStatus.textContent = 'Stopped';
         }
     }
 

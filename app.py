@@ -7,6 +7,8 @@ from flask import Flask, render_template, jsonify, request
 from flask_socketio import SocketIO, emit
 import threading
 import time
+import pandas as pd
+import numpy as np
 from datetime import datetime, timedelta
 import json
 import os
@@ -14,6 +16,25 @@ from signal_generator import SignalGenerator
 from trade_tracker import TradeTracker
 from performance_monitor import PerformanceMonitor
 from integrated_goldai import IntegratedGoldAI
+
+def clean_for_json(obj):
+    """Convert numpy/pandas types to JSON-serializable Python types"""
+    if obj is None:
+        return None
+    elif isinstance(obj, (np.integer, np.int64)):
+        return int(obj)
+    elif isinstance(obj, (np.floating, np.float64)):
+        return float(obj)
+    elif isinstance(obj, np.ndarray):
+        return obj.tolist()
+    elif isinstance(obj, pd.Timestamp):
+        return obj.isoformat()
+    elif isinstance(obj, dict):
+        return {k: clean_for_json(v) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [clean_for_json(item) for item in obj]
+    else:
+        return obj
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'goldai_secret_key_2024'
@@ -67,13 +88,14 @@ def index():
 @app.route('/api/status')
 def get_status():
     """Get current system status"""
-    return jsonify({
-        'running': app_state['running'],
-        'system_status': app_state['system_status'],
-        'last_signal': app_state['last_signal'],
-        'active_trades_count': len(app_state['active_trades']),
+    status_data = {
+        'running': bool(app_state['running']),
+        'system_status': str(app_state['system_status']),
+        'last_signal': clean_for_json(app_state['last_signal']),
+        'active_trades_count': int(len(app_state['active_trades'])) if app_state['active_trades'] else 0,
         'timestamp': datetime.now().isoformat()
-    })
+    }
+    return jsonify(clean_for_json(status_data))
 
 @app.route('/api/signal/current')
 def get_current_signal():
@@ -84,8 +106,9 @@ def get_current_signal():
         
         signal = signal_generator.generate_signal()
         if signal:
-            app_state['last_signal'] = signal
-            return jsonify({'success': True, 'signal': signal})
+            clean_signal = clean_for_json(signal)
+            app_state['last_signal'] = clean_signal
+            return jsonify({'success': True, 'signal': clean_signal})
         return jsonify({'success': False, 'message': 'No signal generated'})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)})
@@ -138,7 +161,10 @@ def start_system():
         thread.daemon = True
         thread.start()
         
-        return jsonify({'success': True, 'message': 'System started'})
+        # Wait a moment for system to start
+        time.sleep(0.5)
+        
+        return jsonify({'success': True, 'message': 'System started successfully'})
     return jsonify({'success': False, 'message': 'System already running'})
 
 @app.route('/api/system/stop', methods=['POST'])
@@ -174,29 +200,52 @@ def run_signal_system():
             current_hour = datetime.now().hour
             
             # Check trades
-            trade_tracker.check_trade_outcomes()
-            trade_tracker.check_time_based_exits()
+            if trade_tracker:
+                try:
+                    if hasattr(trade_tracker, 'check_trade_outcomes'):
+                        trade_tracker.check_trade_outcomes()
+                    if hasattr(trade_tracker, 'check_time_based_exits'):
+                        trade_tracker.check_time_based_exits()
+                except Exception as e:
+                    print(f"Error checking trades: {e}")
             
             # Generate signal
             signal = signal_generator.generate_signal()
             
             if signal and signal['signal'] != 0 and current_hour != last_signal_hour:
-                app_state['last_signal'] = signal
-                trade_tracker.add_trade(signal)
+                clean_signal = clean_for_json(signal)
+                app_state['last_signal'] = clean_signal
+                if trade_tracker and hasattr(trade_tracker, 'add_trade'):
+                    try:
+                        trade_tracker.add_trade(signal)
+                    except Exception as e:
+                        print(f"Error adding trade: {e}")
                 last_signal_hour = current_hour
                 
                 # Emit to connected clients
-                socketio.emit('new_signal', signal)
+                try:
+                    socketio.emit('new_signal', clean_signal)
+                except Exception as e:
+                    print(f"Error emitting new signal: {e}")
                 
             # Update active trades
-            app_state['active_trades'] = trade_tracker.get_active_trades()
+            if trade_tracker:
+                try:
+                    active_trades = trade_tracker.get_active_trades() if hasattr(trade_tracker, 'get_active_trades') else []
+                    app_state['active_trades'] = active_trades
+                except Exception as e:
+                    print(f"Error getting active trades: {e}")
+                    app_state['active_trades'] = []
             
             # Emit status update
-            socketio.emit('status_update', {
-                'timestamp': datetime.now().isoformat(),
-                'active_trades': len(app_state['active_trades']),
-                'last_signal': app_state['last_signal']
-            })
+            try:
+                socketio.emit('status_update', clean_for_json({
+                    'timestamp': datetime.now().isoformat(),
+                    'active_trades': int(len(app_state['active_trades'])),
+                    'last_signal': app_state['last_signal']
+                }))
+            except Exception as e:
+                print(f"Error emitting status update: {e}")
             
             time.sleep(300)  # Check every 5 minutes
             
@@ -209,11 +258,14 @@ def run_signal_system():
 @socketio.on('connect')
 def handle_connect():
     """Handle client connection"""
-    emit('status_update', {
-        'running': app_state['running'],
-        'system_status': app_state['system_status'],
-        'last_signal': app_state['last_signal']
-    })
+    try:
+        emit('status_update', clean_for_json({
+            'running': bool(app_state['running']),
+            'system_status': str(app_state['system_status']),
+            'last_signal': app_state['last_signal']
+        }))
+    except Exception as e:
+        print(f"Error in socket connection: {e}")
 
 if __name__ == '__main__':
     # Ensure model exists

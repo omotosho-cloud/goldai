@@ -179,6 +179,27 @@ class TradeTracker:
         
         return summary
     
+    def get_active_trades(self):
+        """Get list of active trades for API"""
+        trades = self.load_active_trades()
+        active = [t for t in trades if t['status'] == 'active']
+        
+        # Convert to API format
+        api_trades = []
+        for trade in active:
+            signal = trade['signal']
+            api_trades.append({
+                'id': trade['id'],
+                'timestamp': trade['timestamp'],
+                'signal': signal['signal'],
+                'confidence': signal['confidence'],
+                'entry_price': signal['entry_price'],
+                'stop_loss': signal['stop_loss'],
+                'take_profit': signal['take_profit']
+            })
+        
+        return api_trades
+    
     def start_monitoring(self, check_interval=300):  # Check every 5 minutes
         """Start continuous trade monitoring"""
         print("Starting trade monitoring...")
