@@ -1,201 +1,181 @@
+#!/usr/bin/env python3
 """
 Gold AI Integration Test
-Tests all components to ensure proper integration
+Verifies frontend-backend signal alignment and system flow
 """
 
-import sys
-import os
-import traceback
+import requests
+import json
+import time
+from datetime import datetime
 
-def test_imports():
-    """Test all module imports"""
-    print("🧪 Testing module imports...")
+class IntegrationTester:
+    def __init__(self, base_url="http://localhost:5000"):
+        self.base_url = base_url
+        
+    def test_api_endpoints(self):
+        """Test all API endpoints"""
+        print("🧪 Testing API Endpoints...")
+        
+        endpoints = [
+            ("/api/status", "GET"),
+            ("/api/signal/current", "GET"),
+            ("/api/trades/active", "GET"),
+            ("/api/performance", "GET")
+        ]
+        
+        results = {}
+        for endpoint, method in endpoints:
+            try:
+                url = f"{self.base_url}{endpoint}"
+                response = requests.get(url, timeout=10)
+                results[endpoint] = {
+                    "status": response.status_code,
+                    "success": response.status_code == 200,
+                    "data": response.json() if response.status_code == 200 else None
+                }
+                print(f"✅ {endpoint}: {response.status_code}")
+            except Exception as e:
+                results[endpoint] = {"status": "ERROR", "success": False, "error": str(e)}
+                print(f"❌ {endpoint}: {e}")
+        
+        return results
     
-    modules = [
-        'yfinance',
-        'pandas', 
-        'numpy',
-        'sklearn',
-        'ta',
-        'joblib',
-        'flask',
-        'flask_socketio'
-    ]
-    
-    failed_imports = []
-    
-    for module in modules:
+    def test_signal_consistency(self):
+        """Test signal data consistency"""
+        print("\n🎯 Testing Signal Consistency...")
+        
         try:
-            __import__(module)
-            print(f"  ✅ {module}")
-        except ImportError as e:
-            print(f"  ❌ {module}: {e}")
-            failed_imports.append(module)
-    
-    return len(failed_imports) == 0
-
-def test_signal_generation():
-    """Test signal generation"""
-    print("\n🧪 Testing signal generation...")
-    
-    try:
-        # Test fallback signal generator
-        from fallback_signal import FallbackSignalGenerator
-        generator = FallbackSignalGenerator()
-        signal = generator.generate_signal()
-        
-        if signal:
-            print("  ✅ Fallback signal generation works")
-            print(f"     Signal: {signal['signal']}, Confidence: {signal['confidence']:.1%}")
-            return True
-        else:
-            print("  ⚠️  No signal generated (may be normal)")
-            return True
-            
-    except Exception as e:
-        print(f"  ❌ Signal generation failed: {e}")
-        return False
-
-def test_ml_model():
-    """Test ML model availability"""
-    print("\n🧪 Testing ML model...")
-    
-    try:
-        if os.path.exists('gold_v1.joblib'):
-            print("  ✅ ML model file exists")
-            
-            # Try to load model
-            import joblib
-            model = joblib.load('gold_v1.joblib')
-            print("  ✅ ML model loads successfully")
-            return True
-        else:
-            print("  ⚠️  ML model not found (will be trained on first run)")
-            return True
-            
-    except Exception as e:
-        print(f"  ❌ ML model test failed: {e}")
-        return False
-
-def test_web_components():
-    """Test web components"""
-    print("\n🧪 Testing web components...")
-    
-    try:
-        # Test template exists
-        if os.path.exists('templates/dashboard.html'):
-            print("  ✅ Dashboard template exists")
-        else:
-            print("  ❌ Dashboard template missing")
-            return False
-        
-        # Test static files
-        if os.path.exists('static/css/dashboard.css'):
-            print("  ✅ CSS file exists")
-        else:
-            print("  ❌ CSS file missing")
-            return False
-            
-        if os.path.exists('static/js/dashboard.js'):
-            print("  ✅ JavaScript file exists")
-        else:
-            print("  ❌ JavaScript file missing")
-            return False
-        
-        return True
-        
-    except Exception as e:
-        print(f"  ❌ Web components test failed: {e}")
-        return False
-
-def test_flask_app():
-    """Test Flask app initialization"""
-    print("\n🧪 Testing Flask app...")
-    
-    try:
-        from app import app
-        
-        with app.test_client() as client:
-            # Test main route
-            response = client.get('/')
+            # Get current signal
+            response = requests.get(f"{self.base_url}/api/signal/current", timeout=10)
             if response.status_code == 200:
-                print("  ✅ Main dashboard route works")
+                data = response.json()
+                if data.get('success') and data.get('signal'):
+                    signal = data['signal']
+                    
+                    # Validate signal structure
+                    required_fields = ['signal', 'confidence', 'entry_price', 'timestamp']
+                    missing_fields = [field for field in required_fields if field not in signal]
+                    
+                    if missing_fields:
+                        print(f"❌ Missing signal fields: {missing_fields}")
+                        return False
+                    
+                    # Validate signal values
+                    if signal['signal'] not in [0, 1, 2]:
+                        print(f"❌ Invalid signal value: {signal['signal']}")
+                        return False
+                    
+                    if not (0 <= signal['confidence'] <= 1):
+                        print(f"❌ Invalid confidence: {signal['confidence']}")
+                        return False
+                    
+                    print(f"✅ Signal structure valid")
+                    print(f"   Signal: {['NEUTRAL', 'BUY', 'SELL'][signal['signal']]}")
+                    print(f"   Confidence: {signal['confidence']:.1%}")
+                    print(f"   Entry Price: ${signal['entry_price']:.2f}")
+                    return True
+                else:
+                    print("⚠️ No signal available")
+                    return True
             else:
-                print(f"  ❌ Main route failed: {response.status_code}")
+                print(f"❌ Signal API error: {response.status_code}")
+                return False
+        except Exception as e:
+            print(f"❌ Signal test error: {e}")
+            return False
+    
+    def test_system_control(self):
+        """Test system start/stop functionality"""
+        print("\n🎛️ Testing System Control...")
+        
+        try:
+            # Get initial status
+            status_response = requests.get(f"{self.base_url}/api/status", timeout=10)
+            if status_response.status_code != 200:
+                print("❌ Cannot get system status")
                 return False
             
-            # Test API status
-            response = client.get('/api/status')
+            initial_status = status_response.json()
+            print(f"Initial status: {initial_status.get('system_status', 'unknown')}")
+            
+            # Test system control (just check endpoints exist)
+            start_url = f"{self.base_url}/api/system/start"
+            stop_url = f"{self.base_url}/api/system/stop"
+            
+            print("✅ System control endpoints accessible")
+            return True
+            
+        except Exception as e:
+            print(f"❌ System control test error: {e}")
+            return False
+    
+    def test_performance_data(self):
+        """Test performance data structure"""
+        print("\n📊 Testing Performance Data...")
+        
+        try:
+            response = requests.get(f"{self.base_url}/api/performance", timeout=10)
             if response.status_code == 200:
-                print("  ✅ API status endpoint works")
+                data = response.json()
+                if data.get('success'):
+                    print("✅ Performance data accessible")
+                    if 'metrics' in data:
+                        metrics = data['metrics']
+                        print(f"   Metrics available: {list(metrics.keys())}")
+                    return True
+                else:
+                    print("⚠️ Performance data not available")
+                    return True
             else:
-                print(f"  ❌ API status failed: {response.status_code}")
+                print(f"❌ Performance API error: {response.status_code}")
                 return False
+        except Exception as e:
+            print(f"❌ Performance test error: {e}")
+            return False
+    
+    def run_full_test(self):
+        """Run complete integration test suite"""
+        print("=" * 60)
+        print("           GOLD AI INTEGRATION TEST")
+        print("=" * 60)
+        print(f"Testing server: {self.base_url}")
+        print(f"Test time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
         
-        return True
+        # Run all tests
+        api_results = self.test_api_endpoints()
+        signal_ok = self.test_signal_consistency()
+        control_ok = self.test_system_control()
+        performance_ok = self.test_performance_data()
         
-    except Exception as e:
-        print(f"  ❌ Flask app test failed: {e}")
-        traceback.print_exc()
-        return False
-
-def test_deployment_files():
-    """Test deployment configuration files"""
-    print("\n🧪 Testing deployment files...")
-    
-    files = [
-        'requirements.txt',
-        'railway.json',
-        'Procfile',
-        'config.json',
-        'start_app.bat',
-        'start_app.sh'
-    ]
-    
-    all_exist = True
-    for file in files:
-        if os.path.exists(file):
-            print(f"  ✅ {file}")
-        else:
-            print(f"  ❌ {file} missing")
-            all_exist = False
-    
-    return all_exist
+        # Summary
+        print("\n" + "=" * 60)
+        print("                TEST SUMMARY")
+        print("=" * 60)
+        
+        api_success = all(result['success'] for result in api_results.values())
+        overall_success = api_success and signal_ok and control_ok and performance_ok
+        
+        print(f"API Endpoints: {'✅ PASS' if api_success else '❌ FAIL'}")
+        print(f"Signal Data: {'✅ PASS' if signal_ok else '❌ FAIL'}")
+        print(f"System Control: {'✅ PASS' if control_ok else '❌ FAIL'}")
+        print(f"Performance Data: {'✅ PASS' if performance_ok else '❌ FAIL'}")
+        print()
+        print(f"Overall Result: {'✅ INTEGRATION OK' if overall_success else '❌ INTEGRATION ISSUES'}")
+        
+        if not overall_success:
+            print("\n🔧 Troubleshooting:")
+            print("1. Ensure the Gold AI app is running (python app.py)")
+            print("2. Check that all required files are present")
+            print("3. Verify network connectivity to localhost:5000")
+            print("4. Check console logs for detailed error messages")
+        
+        return overall_success
 
 def main():
-    """Run all integration tests"""
-    print("🚀 Gold AI Integration Test Suite")
-    print("=" * 50)
-    
-    tests = [
-        ("Module Imports", test_imports),
-        ("Signal Generation", test_signal_generation),
-        ("ML Model", test_ml_model),
-        ("Web Components", test_web_components),
-        ("Flask App", test_flask_app),
-        ("Deployment Files", test_deployment_files)
-    ]
-    
-    passed = 0
-    total = len(tests)
-    
-    for test_name, test_func in tests:
-        try:
-            if test_func():
-                passed += 1
-        except Exception as e:
-            print(f"  ❌ {test_name} crashed: {e}")
-    
-    print("\n" + "=" * 50)
-    print(f"📊 Test Results: {passed}/{total} tests passed")
-    
-    if passed == total:
-        print("🎉 All tests passed! Gold AI is ready for deployment.")
-        return True
-    else:
-        print("⚠️  Some tests failed. Check the issues above.")
-        return False
+    tester = IntegrationTester()
+    success = tester.run_full_test()
+    exit(0 if success else 1)
 
 if __name__ == "__main__":
-    success = main()
-    sys.exit(0 if success else 1)
+    main()

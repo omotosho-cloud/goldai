@@ -16,8 +16,8 @@
                 Gold AI Signal Generator
             </span>
             <div class="d-flex">
-                <span id="status-badge" class="badge bg-secondary me-2">Stopped</span>
-                <button id="toggle-system" class="btn btn-success btn-sm">Start System</button>
+                <span id="status-badge" class="badge bg-success me-2">Running</span>
+                <span class="text-light">Professional Trading Signals</span>
             </div>
         </div>
     </nav>
@@ -31,9 +31,9 @@
                         <div class="d-flex justify-content-between">
                             <div>
                                 <h6 class="card-title">System Status</h6>
-                                <h4 id="system-status">Stopped</h4>
+                                <h4 id="system-status">Running</h4>
                             </div>
-                            <i class="fas fa-power-off fa-2x opacity-75"></i>
+                            <i class="fas fa-cog fa-spin fa-2x opacity-75"></i>
                         </div>
                     </div>
                 </div>
@@ -85,7 +85,7 @@
                 <div class="card">
                     <div class="card-header d-flex justify-content-between align-items-center">
                         <h5 class="mb-0">Current Signal</h5>
-                        <button id="refresh-signal" class="btn btn-outline-primary btn-sm">
+                        <button id="refresh-signal" class="btn btn-outline-light btn-sm">
                             <i class="fas fa-sync-alt"></i> Refresh
                         </button>
                     </div>
@@ -105,7 +105,7 @@
                 <div class="card">
                     <div class="card-header d-flex justify-content-between align-items-center">
                         <h5 class="mb-0">Active Trades</h5>
-                        <button id="refresh-trades" class="btn btn-outline-success btn-sm">
+                        <button id="refresh-trades" class="btn btn-outline-light btn-sm">
                             <i class="fas fa-sync-alt"></i> Refresh
                         </button>
                     </div>
@@ -128,7 +128,10 @@
                     <div class="card-header d-flex justify-content-between align-items-center">
                         <h5 class="mb-0">Performance Report</h5>
                         <div>
-                            <button id="refresh-performance" class="btn btn-outline-info btn-sm me-2">
+                            <button id="toggle-system" class="btn btn-success btn-sm me-2">
+                                <i class="fas fa-play"></i> Start System
+                            </button>
+                            <button id="refresh-performance" class="btn btn-outline-light btn-sm me-2">
                                 <i class="fas fa-sync-alt"></i> Refresh
                             </button>
                             <button id="retrain-model" class="btn btn-outline-warning btn-sm">

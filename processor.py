@@ -9,6 +9,7 @@ from datetime import datetime, timezone, timedelta
 import pytz
 import requests
 import os
+from app_config import AppConfig
 
 class DataProcessor:
     def __init__(self):
@@ -20,6 +21,16 @@ class DataProcessor:
             'jrwKMe8SjF37sVie8Pfy_PTNFDhIEeOw'  # Direct fallback
         )
         self.use_polygon = bool(self.polygon_api_key)
+        
+        # Add caching to reduce API calls
+        self._cached_data = None
+        self._cache_timestamp = None
+        self._cache_duration = AppConfig.DATA_CACHE_DURATION
+        
+        # Current price caching
+        self._cached_price = None
+        self._price_cache_timestamp = None
+        self._price_cache_duration = AppConfig.PRICE_CACHE_DURATION
         
     def fetch_polygon_data(self, days=365):
         """Fetch gold data from Polygon API"""
@@ -74,7 +85,15 @@ class DataProcessor:
             raise
         
     def fetch_data(self, period="max"):
-        """Fetch gold data from Polygon API or Yahoo Finance fallback"""
+        """Fetch gold data from Polygon API or Yahoo Finance fallback with caching"""
+        # Check cache first
+        now = datetime.now()
+        if (self._cached_data is not None and 
+            self._cache_timestamp is not None and 
+            (now - self._cache_timestamp).total_seconds() < self._cache_duration):
+            print(f"Using cached data (age: {(now - self._cache_timestamp).total_seconds():.0f}s)")
+            return self._cached_data
+        
         # Try Polygon first if API key available
         if self.use_polygon:
             try:
@@ -87,7 +106,11 @@ class DataProcessor:
                     "max": 1825  # 5 years max for Polygon
                 }
                 days = days_map.get(period, 365)
-                return self.fetch_polygon_data(days)
+                data = self.fetch_polygon_data(days)
+                # Cache the result
+                self._cached_data = data
+                self._cache_timestamp = now
+                return data
             except Exception as e:
                 print(f"Polygon failed: {e}")
                 print("Falling back to Yahoo Finance...")
@@ -107,7 +130,10 @@ class DataProcessor:
                         print(f"Successfully fetched {len(data)} data points from {symbol}")
                         print(f"Date range: {data.index[0]} to {data.index[-1]}")
                         self.symbol = symbol
-                        return data.dropna()
+                        # Cache the result
+                        self._cached_data = data.dropna()
+                        self._cache_timestamp = now
+                        return self._cached_data
                         
                 except Exception as e:
                     print(f"Failed to fetch {symbol} with {period_attempt}: {e}")
@@ -125,12 +151,55 @@ class DataProcessor:
                         print(f"Using daily data from {symbol} with {len(data)} points")
                         print(f"Date range: {data.index[0]} to {data.index[-1]}")
                         self.symbol = symbol
-                        return data.dropna()
+                        # Cache the result
+                        self._cached_data = data.dropna()
+                        self._cache_timestamp = now
+                        return self._cached_data
                         
                 except Exception as e:
                     continue
                 
         raise Exception("Could not fetch any gold data")
+    
+    def get_current_price(self):
+        """Get current gold price with caching"""
+        now = datetime.now()
+        
+        # Check price cache first
+        if (self._cached_price is not None and 
+            self._price_cache_timestamp is not None and 
+            (now - self._price_cache_timestamp).total_seconds() < self._price_cache_duration):
+            return self._cached_price
+        
+        # Try to get current price
+        symbols = ["GC=F", "GOLD", "GLD"]
+        for symbol in symbols:
+            try:
+                ticker = yf.Ticker(symbol)
+                info = ticker.info
+                if 'regularMarketPrice' in info:
+                    price = float(info['regularMarketPrice'])
+                    self._cached_price = price
+                    self._price_cache_timestamp = now
+                    return price
+                elif 'currentPrice' in info:
+                    price = float(info['currentPrice'])
+                    self._cached_price = price
+                    self._price_cache_timestamp = now
+                    return price
+            except Exception as e:
+                print(f"Could not fetch current price from {symbol}: {e}")
+                continue
+        
+        # Fallback: use last close price from cached data
+        if self._cached_data is not None and len(self._cached_data) > 0:
+            price = float(self._cached_data['Close'].iloc[-1])
+            self._cached_price = price
+            self._price_cache_timestamp = now
+            return price
+        
+        print("Could not fetch current price")
+        return None
     
     def add_indicators(self, df):
         """Calculate technical indicators"""

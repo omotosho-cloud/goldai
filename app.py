@@ -73,11 +73,11 @@ except Exception as e:
 
 # App state
 app_state = {
-    'running': False,
+    'running': True,  # Auto-start system
     'last_signal': None,
     'active_trades': [],
     'performance_data': {},
-    'system_status': 'stopped'
+    'system_status': 'starting'
 }
 
 @app.route('/')
@@ -186,20 +186,30 @@ def retrain_model():
         return jsonify({'success': False, 'error': str(e)})
 
 def run_signal_system():
-    """Background thread for signal generation"""
-    if signal_generator is None or trade_tracker is None:
-        print("Cannot start signal system: Required components not available")
+    """Background thread for signal generation - Hourly strategy (manual refresh UI)"""
+    if signal_generator is None:
+        print("Cannot start signal system: Signal generator not available")
         app_state['system_status'] = 'error'
         return
     
+    print("✅ Signal generation system started - Hourly Strategy")
     app_state['system_status'] = 'running'
-    last_signal_hour = None
+    
+    # Sync to next hour start
+    now = datetime.now()
+    minutes_to_next_hour = 60 - now.minute
+    seconds_to_next_hour = (minutes_to_next_hour * 60) - now.second
+    
+    if minutes_to_next_hour < 60:
+        print(f"⏰ Syncing to next hour in {minutes_to_next_hour} minutes...")
+        time.sleep(seconds_to_next_hour)
     
     while app_state['running']:
         try:
-            current_hour = datetime.now().hour
+            current_time = datetime.now()
+            print(f"\n[{current_time.strftime('%Y-%m-%d %H:%M:%S')}] Hourly Market Analysis...")
             
-            # Check trades
+            # Check trades every hour
             if trade_tracker:
                 try:
                     if hasattr(trade_tracker, 'check_trade_outcomes'):
@@ -209,30 +219,36 @@ def run_signal_system():
                 except Exception as e:
                     print(f"Error checking trades: {e}")
             
-            # Generate signal
+            # Generate signal (uses cached data)
             signal = signal_generator.generate_signal()
             
-            if signal and signal['signal'] != 0 and current_hour != last_signal_hour:
+            if signal and signal['signal'] != 0:
                 clean_signal = clean_for_json(signal)
                 app_state['last_signal'] = clean_signal
+                
+                print(f"🎯 NEW SIGNAL: {['NEUTRAL', 'BUY', 'SELL'][signal['signal']]} - Confidence: {signal['confidence']:.1%}")
+                
                 if trade_tracker and hasattr(trade_tracker, 'add_trade'):
                     try:
                         trade_tracker.add_trade(signal)
                     except Exception as e:
                         print(f"Error adding trade: {e}")
-                last_signal_hour = current_hour
                 
-                # Emit to connected clients
+                # Emit to connected clients via WebSocket
                 try:
                     socketio.emit('new_signal', clean_signal)
+                    print("📡 Signal broadcasted to clients")
                 except Exception as e:
                     print(f"Error emitting new signal: {e}")
+            else:
+                print("📊 No signal generated (conditions not met or neutral)")
                 
             # Update active trades
             if trade_tracker:
                 try:
                     active_trades = trade_tracker.get_active_trades() if hasattr(trade_tracker, 'get_active_trades') else []
                     app_state['active_trades'] = active_trades
+                    print(f"📈 Active trades: {len(active_trades)}")
                 except Exception as e:
                     print(f"Error getting active trades: {e}")
                     app_state['active_trades'] = []
@@ -247,11 +263,15 @@ def run_signal_system():
             except Exception as e:
                 print(f"Error emitting status update: {e}")
             
-            time.sleep(300)  # Check every 5 minutes
+            # Wait exactly 1 hour for next signal
+            next_hour = current_time.replace(minute=0, second=0, microsecond=0) + timedelta(hours=1)
+            print(f"⏳ Next signal generation at {next_hour.strftime('%H:00')}")
+            print("💡 Use manual refresh buttons for immediate updates")
+            time.sleep(3600)  # Wait 1 hour
             
         except Exception as e:
             print(f"Error in signal system: {e}")
-            time.sleep(60)
+            time.sleep(300)  # Wait 5 minutes on error, then retry
     
     app_state['system_status'] = 'stopped'
 
@@ -277,6 +297,13 @@ if __name__ == '__main__':
     
     print("🚀 Starting Gold AI Signal App")
     print("📊 Dashboard: http://localhost:5000")
+    
+    # Auto-start signal system
+    if signal_generator and trade_tracker:
+        print("🤖 Auto-starting signal generation system...")
+        thread = threading.Thread(target=run_signal_system)
+        thread.daemon = True
+        thread.start()
     
     # Get port from environment (Railway sets PORT)
     port = int(os.environ.get('PORT', 5000))

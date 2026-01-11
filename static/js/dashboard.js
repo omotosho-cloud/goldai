@@ -11,15 +11,15 @@ class GoldAIDashboard {
         this.setupEventListeners();
         this.setupSocketListeners();
         this.loadInitialData();
-        this.startPeriodicUpdates();
+        this.startHourlyRefresh();
     }
 
     setupEventListeners() {
-        // System toggle
+        // System control
         document.getElementById('toggle-system').addEventListener('click', () => {
             this.toggleSystem();
         });
-
+        
         // Refresh buttons
         document.getElementById('refresh-signal').addEventListener('click', () => {
             this.refreshCurrentSignal();
@@ -51,35 +51,60 @@ class GoldAIDashboard {
         });
 
         this.socket.on('new_signal', (signal) => {
+            console.log('New signal received via WebSocket:', signal);
             this.displaySignal(signal);
             this.showNotification(`New ${this.getSignalName(signal.signal)} signal generated!`, 'info');
+            
+            // Update last signal timestamp
+            const now = new Date().toLocaleTimeString();
+            console.log(`Signal updated at ${now}`);
         });
 
         this.socket.on('status_update', (data) => {
+            console.log('Status update received:', data);
             this.updateStatus(data);
+            // Auto-refresh status when system state changes
+            this.refreshStatus();
         });
     }
 
     async loadInitialData() {
+        console.log('Loading initial dashboard data...');
         await Promise.all([
             this.refreshStatus(),
             this.refreshCurrentSignal(),
             this.refreshActiveTrades(),
             this.refreshPerformance()
         ]);
+        console.log('Initial data loaded successfully');
     }
 
-    startPeriodicUpdates() {
-        // Update status every 30 seconds
-        setInterval(() => {
-            this.refreshStatus();
-        }, 30000);
-
-        // Update performance every 5 minutes
-        setInterval(() => {
-            this.refreshPerformance();
-        }, 300000);
+    startHourlyRefresh() {
+        // Sync to next hour and refresh hourly (aligned with signal generation)
+        const now = new Date();
+        const msToNextHour = (60 - now.getMinutes()) * 60 * 1000 - now.getSeconds() * 1000;
+        
+        console.log(`Next auto-refresh in ${Math.round(msToNextHour/60000)} minutes (at ${new Date(Date.now() + msToNextHour).toLocaleTimeString()})`);
+        
+        // First refresh at next hour
+        setTimeout(() => {
+            this.hourlyRefresh();
+            // Then refresh every hour
+            setInterval(() => {
+                this.hourlyRefresh();
+            }, 3600000); // 1 hour
+        }, msToNextHour);
     }
+    
+    hourlyRefresh() {
+        console.log('🔄 Hourly auto-refresh (aligned with signal generation)');
+        this.refreshStatus();
+        this.refreshActiveTrades();
+        // Signal will come via WebSocket, but refresh in case of connection issues
+        setTimeout(() => this.refreshCurrentSignal(), 2000);
+    }
+
+
 
     async toggleSystem() {
         const button = document.getElementById('toggle-system');
@@ -117,14 +142,27 @@ class GoldAIDashboard {
             const response = await fetch('/api/status');
             const data = await response.json();
             
+            // Update system running state
             this.isSystemRunning = data.running;
+            
+            // Update UI elements
+            document.getElementById('system-status').textContent = data.system_status === 'running' ? 'Running' : 'Stopped';
+            document.getElementById('active-trades-count').textContent = data.active_trades_count || 0;
+            
+            // Update status badge
+            const badge = document.getElementById('status-badge');
+            if (data.running) {
+                badge.textContent = 'Running';
+                badge.className = 'badge bg-success me-2';
+            } else {
+                badge.textContent = 'Stopped';
+                badge.className = 'badge bg-secondary me-2';
+            }
+            
+            // Update system button
             this.updateSystemButton();
             
-            document.getElementById('active-trades-count').textContent = data.active_trades_count;
-            
-            // Update last update time
-            const now = new Date().toLocaleTimeString();
-            console.log(`Status updated at ${now}: Running=${data.running}`);
+            console.log(`Status updated: ${data.system_status}, Running: ${data.running}`);
         } catch (error) {
             console.error('Error refreshing status:', error);
         }
@@ -376,17 +414,11 @@ class GoldAIDashboard {
         const systemStatus = document.getElementById('system-status');
         
         if (this.isSystemRunning) {
-            button.textContent = 'Stop System';
-            button.className = 'btn btn-danger btn-sm';
-            statusBadge.textContent = 'Running';
-            statusBadge.className = 'badge bg-success me-2';
-            systemStatus.textContent = 'Running';
+            button.innerHTML = '<i class="fas fa-stop"></i> Stop System';
+            button.className = 'btn btn-danger btn-sm me-2';
         } else {
-            button.textContent = 'Start System';
-            button.className = 'btn btn-success btn-sm btn-pulse';
-            statusBadge.textContent = 'Stopped';
-            statusBadge.className = 'badge bg-secondary me-2';
-            systemStatus.textContent = 'Stopped';
+            button.innerHTML = '<i class="fas fa-play"></i> Start System';
+            button.className = 'btn btn-success btn-sm me-2 btn-pulse';
         }
     }
 

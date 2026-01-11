@@ -161,6 +161,21 @@ body {
     min-width: 300px;
 }
 
+/* Ensure toggle-system button stays in performance section only */
+#toggle-system {
+    position: relative !important;
+    float: none !important;
+    top: auto !important;
+    right: auto !important;
+}
+
+/* Hide any duplicate or floating system buttons */
+.navbar #toggle-system,
+.position-fixed #toggle-system,
+.position-absolute #toggle-system {
+    display: none !important;
+}
+
 .navbar-brand {
     font-weight: bold;
     font-size: 1.5rem;
