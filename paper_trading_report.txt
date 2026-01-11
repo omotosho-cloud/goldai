@@ -1,0 +1,18 @@
+
+PAPER TRADING REPORT
+====================
+Duration: 0 days
+Initial Balance: $10,000.00
+Final Balance: $10,000.00
+Total Return: 0.00%
+
+Signal Statistics:
+- Total Signals Generated: 0
+- Signals Executed: 0
+- Execution Rate: 0.0%
+- Execution Issues: 0
+
+Active Trades: 0
+Closed Trades: 0
+
+Execution Issues:

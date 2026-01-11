@@ -1,0 +1,61 @@
+{
+  "app_config": {
+    "name": "Gold AI Signal Generator",
+    "version": "2.0.0",
+    "description": "Professional AI-powered XAU/USD trading signals",
+    "host": "0.0.0.0",
+    "port": 5000,
+    "debug": false
+  },
+  "trading_config": {
+    "symbol": "XAU/USD",
+    "timeframe": "1h",
+    "confidence_threshold": 0.70,
+    "max_active_trades": 5,
+    "risk_per_trade": 0.02,
+    "sessions": {
+      "london": {"start": 8, "end": 16},
+      "new_york": {"start": 13, "end": 21},
+      "overlap": {"start": 13, "end": 16}
+    }
+  },
+  "performance_thresholds": {
+    "min_win_rate": 0.55,
+    "min_profit_factor": 1.2,
+    "min_trades_for_validation": 20,
+    "evaluation_window_days": 30
+  },
+  "notifications": {
+    "telegram": {
+      "enabled": false,
+      "bot_token": "YOUR_BOT_TOKEN_HERE",
+      "chat_id": "YOUR_CHAT_ID_HERE"
+    },
+    "email": {
+      "enabled": false,
+      "smtp_server": "smtp.gmail.com",
+      "smtp_port": 587,
+      "username": "your_email@gmail.com",
+      "password": "your_app_password",
+      "recipient": "recipient@gmail.com"
+    }
+  },
+  "data_sources": {
+    "primary": "yahoo_finance",
+    "backup": "alpha_vantage",
+    "update_interval_minutes": 60
+  },
+  "model_config": {
+    "retrain_schedule": "monthly",
+    "retrain_day": 1,
+    "retrain_hour": 2,
+    "backup_models": true,
+    "max_model_age_days": 90
+  },
+  "ui_config": {
+    "theme": "dark",
+    "auto_refresh_seconds": 30,
+    "chart_indicators": ["RSI", "MACD", "EMA", "ATR", "ADX"],
+    "default_chart_period": "1d"
+  }
+}

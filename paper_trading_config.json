@@ -1,0 +1,9 @@
+{
+  "start_date": "2026-01-11",
+  "end_date": "2026-01-25",
+  "initial_balance": 10000,
+  "max_risk_per_trade": 0.02,
+  "spread_buffer": 0.0005,
+  "slippage_buffer": 0.0003,
+  "execution_delay": 2
+}

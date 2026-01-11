@@ -1,0 +1,9 @@
+2026-01-11 04:19:24,519 - INFO - Starting paper trading for 336 hours...
+2026-01-11 04:19:28,509 - ERROR - Error getting current price: DataProcessor.fetch_data() got an unexpected keyword argument 'limit'
+2026-01-11 04:21:12,889 - INFO - Paper trading stopped by user
+2026-01-11 04:21:12,916 - INFO - Paper trading report saved
+2026-01-11 04:21:22,508 - INFO - Starting paper trading for 336 hours...
+2026-01-11 04:21:31,740 - ERROR - $GC=F: possibly delisted; no price data found  (1h 2024-01-11 22:21:27-05:00 -> 2026-01-10 22:21:22-05:00) (Yahoo error = "1h data not available for startTime=1705029687 and endTime=1768101682. The requested range must be within the last 730 days.")
+2026-01-11 04:21:32,525 - ERROR - $GC=F: possibly delisted; no price data found  (period=10y) (Yahoo error = "1h data not available for startTime=1452741693 and endTime=1768101693. The requested range must be within the last 730 days.")
+2026-01-11 04:21:33,565 - ERROR - $GC=F: possibly delisted; no price data found  (period=5y) (Yahoo error = "1h data not available for startTime=1610421694 and endTime=1768101694. The requested range must be within the last 730 days.")
+2026-01-11 04:21:35,602 - ERROR - Error getting current price: 'close'
